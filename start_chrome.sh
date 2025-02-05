@@ -8,9 +8,10 @@ NC='\033[0m'
 
 # 版本检查函数
 check_drivers() {
-    # 获取Chrome主版本号
-    CHROME_VERSION=$(/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --version | awk '{print $3}' | cut -d'.' -f1)
-    echo -e "${YELLOW}检测到Chrome主版本: ${CHROME_VERSION}${NC}"
+    # 获取Chrome完整版本号（例如：133.0.6943.53）
+    CHROME_FULL_VERSION=$(/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --version | awk '{print $3}')
+    CHROME_MAJOR_VERSION=$(echo "$CHROME_FULL_VERSION" | cut -d'.' -f1)  # 只取主版本号
+    echo -e "${YELLOW}检测到Chrome版本: ${CHROME_FULL_VERSION}${NC}"
 
     # 检查chromedriver安装状态
     check_driver() {
@@ -28,10 +29,10 @@ check_drivers() {
             return 1
         fi
         
-        DRIVER_VERSION=$($DRIVER_PATH --version | awk '{print $2}' | cut -d'.' -f1)
-        echo -e "${YELLOW}当前chromedriver主版本: ${DRIVER_VERSION}${NC}"
+        DRIVER_VERSION=$($DRIVER_PATH --version | awk '{print $2}')
+        echo -e "${YELLOW}当前chromedriver版本: ${DRIVER_VERSION}${NC}"
         
-        if [ "$DRIVER_VERSION" -ne "$CHROME_VERSION" ]; then
+        if [[ ! "$DRIVER_VERSION" == "$CHROME_MAJOR_VERSION"* ]]; then
             echo -e "${RED}版本不兼容！${NC}"
             return 1
         fi
@@ -40,24 +41,15 @@ check_drivers() {
 
     # 自动安装驱动
     install_driver() {
-        echo -e "${YELLOW}正在获取最新匹配版本...${NC}"
-        LATEST=$(curl -s "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_$CHROME_VERSION")
-        
-        echo -e "${YELLOW}下载chromedriver ${LATEST}...${NC}"
-        if ! wget -q "https://chromedriver.storage.googleapis.com/$LATEST/chromedriver_mac64.zip"; then
-            echo -e "${RED}下载失败！${NC}"
+        echo -e "${YELLOW}正在使用Homebrew安装chromedriver...${NC}"
+        brew install --cask chromedriver
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}安装成功！${NC}"
+            return 0
+        else
+            echo -e "${RED}安装失败！${NC}"
             return 1
         fi
-        
-        echo -e "${YELLOW}安装新驱动...${NC}"
-        unzip -q chromedriver_mac64.zip
-        sudo rm -f /usr/local/bin/chromedriver
-        sudo mv chromedriver /usr/local/bin/
-        sudo chmod +x /usr/local/bin/chromedriver
-        
-        # 清理临时文件
-        rm chromedriver_mac64.zip
-        echo -e "${GREEN}驱动更新完成！${NC}"
     }
 
     # 执行版本检查
@@ -66,7 +58,7 @@ check_drivers() {
         if install_driver; then
             echo -e "${GREEN}版本兼容性问题已解决！${NC}"
         else
-            echo -e "${RED}自动更新失败，请手动处理！${NC}"
+            echo -e "${RED}自动更新失败！${NC}"
             return 1
         fi
     else
@@ -93,4 +85,4 @@ echo -e "${YELLOW}正在启动Chrome...${NC}"
     --user-data-dir="$HOME/ChromeDebug" \
     https://polymarket.com/markets/crypto
 
-echo -e "${GREEN}Chrome已成功启动!${NC}"
+echo -e "${GREEN}Chrome已成功启动！${NC}"
