@@ -30,24 +30,28 @@ check_drivers() {
         fi
         
         DRIVER_VERSION=$($DRIVER_PATH --version | awk '{print $2}')
+        DRIVER_MAJOR_VERSION=$(echo "$DRIVER_VERSION" | cut -d'.' -f1)
         echo -e "${YELLOW}当前chromedriver版本: ${DRIVER_VERSION}${NC}"
         
-        if [[ ! "$DRIVER_VERSION" == "$CHROME_MAJOR_VERSION"* ]]; then
-            echo -e "${RED}版本不兼容！${NC}"
+        # 新的版本比较逻辑：只有当驱动版本小于Chrome版本时才需要更新
+        if [ "$DRIVER_MAJOR_VERSION" -lt "$CHROME_MAJOR_VERSION" ]; then
+            echo -e "${RED}驱动版本过低，需要更新！${NC}"
             return 1
         fi
+        echo -e "${GREEN}驱动版本兼容！${NC}"
         return 0
     }
 
     # 自动安装驱动
     install_driver() {
         echo -e "${YELLOW}正在使用Homebrew安装chromedriver...${NC}"
-        brew install --cask chromedriver
+        # 先尝试更新
+        brew upgrade --cask chromedriver 2>/dev/null || brew install --cask chromedriver
         if [ $? -eq 0 ]; then
-            echo -e "${GREEN}安装成功！${NC}"
+            echo -e "${GREEN}驱动安装/更新成功！${NC}"
             return 0
         else
-            echo -e "${RED}安装失败！${NC}"
+            echo -e "${RED}驱动安装失败！${NC}"
             return 1
         fi
     }
@@ -56,13 +60,16 @@ check_drivers() {
     if ! check_driver; then
         echo -e "${YELLOW}正在尝试自动更新驱动...${NC}"
         if install_driver; then
-            echo -e "${GREEN}版本兼容性问题已解决！${NC}"
+            if check_driver; then
+                echo -e "${GREEN}版本兼容性问题已解决！${NC}"
+            else
+                echo -e "${RED}更新后版本仍不兼容！${NC}"
+                return 1
+            fi
         else
             echo -e "${RED}自动更新失败！${NC}"
             return 1
         fi
-    else
-        echo -e "${GREEN}版本兼容性检查通过！${NC}"
     fi
 
     # 更新PATH环境变量
